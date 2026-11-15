@@ -1,0 +1,108 @@
+{
+  "_comment": "Causes confirmed by reading the installed source of each flagged indicator. Paths are relative to site-packages. An entry applies only to the listed version; a flagged indicator without a matching entry is reported as unconfirmed.",
+  "ta/trend.KSTIndicator": {
+    "version": "0.11.0",
+    "classification": "undocumented leak",
+    "cause": "Each rate of change is computed against close.shift(r, fill_value=close.mean()), so the first r rows are compared with the mean of the whole series, future included. With the default windows the contaminated values are KST rows 14-43 and signal rows 14-51 (the first 14 rows are missing); later rows are clean.",
+    "source": "ta/trend.py:500-535",
+    "documentation": "Not mentioned in the class docstring (ta/trend.py:440-462). The same fill was reported for the daily-return indicator (bukosabino/ta issue 323) and removed there (pull request 324, merged 2023-10-29); the KST lines are unchanged on the master branch as of 2026-11-15."
+  },
+  "finta/ICHIMOKU": {
+    "version": "1.3",
+    "classification": "leaks by design, not documented",
+    "cause": "The Chikou span is ohlc['close'].shift(-chikou_period): the value at row t is the close 26 rows later. This is the standard definition of the span, which is drawn 26 bars behind price on a chart.",
+    "source": "finta/finta.py:1897-1900",
+    "documentation": "The docstring (finta/finta.py:1857-1862) does not say that the column holds future closes."
+  },
+  "finta/QSTICK": {
+    "version": "1.3",
+    "classification": "output depends on input length, no future values read",
+    "cause": "The function takes ohlc['close'].tail(period) and ohlc['open'].tail(period) and returns (close - open) / period for those rows only. It is not a rolling average: the output exists for the last 14 rows of whatever frame is passed, so the value at row t depends on how many rows follow it. The values themselves use only the row's own open and close.",
+    "source": "finta/finta.py:1775-1780",
+    "documentation": "The docstring (finta/finta.py:1771-1773) describes an average over the past N days."
+  },
+  "finta/SAR": {
+    "version": "1.3",
+    "classification": "undocumented leak",
+    "cause": "The recursion is seeded with low[0] - (high - low).std(), the standard deviation of the bar range over the whole series. The seed enters each later value through the recursion. The dependence ends once the path has reversed and resynchronised: a reversal sets the value to the running extreme, which does not involve the seed. Only observable on an integer index: on a date index the function raises KeyError under pandas 3.1 because of high[0].",
+    "source": "finta/finta.py:829",
+    "documentation": "Not mentioned in the docstring (finta/finta.py:822-824)."
+  },
+  "finta/STOCHRSI": {
+    "version": "1.3",
+    "classification": "undocumented leak",
+    "cause": "RSI is scaled as (rsi - rsi.min()) / (rsi.max() - rsi.min()) with the minimum and maximum of the whole series, not of the trailing stoch_period window, and then smoothed. Every value changes whenever a later RSI sets a new extreme.",
+    "source": "finta/finta.py:1237",
+    "documentation": "The docstring (finta/finta.py:1231-1233) describes the range 'over a set time period'."
+  },
+  "finta/WILLIAMS_FRACTAL": {
+    "version": "1.3",
+    "classification": "leaks by design, documented",
+    "cause": "Both outputs use rolling(window=2 * period + 1, center=True), so the flag at row t reads period = 2 rows after t. A fractal is defined by the bars on both sides of it.",
+    "source": "finta/finta.py:2227, 2233",
+    "documentation": "finta/finta.py:2211: period is 'how many lower highs/higher lows the extremum value should be preceded and followed'."
+  },
+  "pandas_ta_classic/overlap.ichimoku": {
+    "version": "0.9.0",
+    "classification": "leaks by design, documented",
+    "cause": "chikou_span = close.shift(-kijun); include_chikou defaults to True.",
+    "source": "pandas_ta_classic/overlap/ichimoku.py:57",
+    "documentation": "pandas_ta_classic/overlap/ichimoku.py:146-148 and 156-157: 'Not causal: the chikou span is close.shift(-kijun), a later bar's close'; lookahead=False drops the column."
+  },
+  "pandas_ta_classic/statistics.tos_stdevall": {
+    "version": "0.9.0",
+    "classification": "leaks by design, documented",
+    "cause": "One regression line (np.polyfit) and one standard deviation are fitted over the whole series and returned for every row.",
+    "source": "pandas_ta_classic/statistics/tos_stdevall.py:72-74",
+    "documentation": "pandas_ta_classic/statistics/tos_stdevall.py:102-109: 'Not causal. A single linear regression is fitted over the whole window'; lookahead=False returns None with a warning."
+  },
+  "pandas_ta_classic/trend.dpo": {
+    "version": "0.9.0",
+    "classification": "leaks by design, documented",
+    "cause": "With centered=True (the default) the result is (close.shift(t) - sma).shift(-t) with t = int(0.5 * length) + 1 = 11, so the value at row t uses the moving average ending 11 rows later.",
+    "source": "pandas_ta_classic/trend/dpo.py:39",
+    "documentation": "pandas_ta_classic/trend/dpo.py:76-78 and 82-84: 'Not causal: the value at a bar uses the SMA ending int(0.5 * length) + 1 bars later'; lookahead=False turns centring off."
+  },
+  "btalib/ht_trendmode": {
+    "version": "1.0.0",
+    "classification": "undocumented leak",
+    "cause": "Index handling. The working series passed to _periodize have their first 6 rows removed, so on an integer index their labels start at 6. Scalar reads and writes such as price[i] and trendbuf[i] = trend are then label-based, while the trendline sum price0[i - (dcperiod - 1):i + 1] is a positional slice that ends 6 rows later. The trend flag written at label i therefore depends on prices up to row i + 6, and the last 6 rows are never written. Only observable on an integer index: on a date index the function raises KeyError under pandas 3.1.",
+    "source": "btalib/indicators/ht_trendmode.py:165 (positional slice) against 62, 137, 192 and 195 (label-based access)",
+    "documentation": "Not documented; the code is written as if all access were positional."
+  },
+  "ta[fillna=True]/momentum.KAMAIndicator": {
+    "version": "0.11.0",
+    "classification": "undocumented leak",
+    "cause": "The volatility and efficiency-ratio terms use np.roll, which wraps around: the first rows are differenced against the last rows of the series. With fillna=False the affected rows are masked (the rolling sum has min_periods=window and the first valid KAMA value is set to the close). With fillna=True min_periods is 0, the wrapped values enter the smoothing constant of rows 1-9, and the recursion carries the error forward with decaying size.",
+    "source": "ta/momentum.py:319-323",
+    "documentation": "Not documented. Reported upstream in 2020 (bukosabino/ta issue 181, still open)."
+  },
+  "ta[fillna=True]/trend.DPOIndicator": {
+    "version": "0.11.0",
+    "classification": "undocumented leak",
+    "cause": "close.shift(11, fill_value=close.mean()) puts the mean of the whole series in the first 11 rows. With fillna=False those rows are missing because the moving average has min_periods=window; with fillna=True min_periods is 0 and rows 0-10 are returned.",
+    "source": "ta/trend.py:596-602",
+    "documentation": "Not documented."
+  },
+  "ta[fillna=True]/trend.KSTIndicator": {
+    "version": "0.11.0",
+    "classification": "undocumented leak",
+    "cause": "Same cause as with the default: close.shift(r, fill_value=close.mean()). With fillna=True the rolling means have min_periods=0, so the contaminated values start at row 0.",
+    "source": "ta/trend.py:492-535",
+    "documentation": "Not documented."
+  },
+  "ta[fillna=True]/trend.TRIXIndicator": {
+    "version": "0.11.0",
+    "classification": "undocumented leak",
+    "cause": "ema3.shift(1, fill_value=ema3.mean()) puts the mean of the whole triple-smoothed series in row 0. With fillna=False row 0 is missing; with fillna=True the moving averages have min_periods=0 and row 0 is returned.",
+    "source": "ta/trend.py:273-275",
+    "documentation": "Not documented."
+  },
+  "ta[fillna=True]/trend.VortexIndicator": {
+    "version": "0.11.0",
+    "classification": "undocumented leak",
+    "cause": "The true range of row 0 is computed against close.shift(1, fill_value=close.mean()). With fillna=False the first 14 rows are missing and row 0 never enters a returned value; with fillna=True the rolling sums have min_periods=0 and rows 0-13 include it.",
+    "source": "ta/trend.py:896-899",
+    "documentation": "Not documented."
+  }
+}

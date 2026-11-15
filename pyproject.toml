@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "futureleak"
+version = "0.1.0"
+description = "Look-ahead leakage auditor for time-series feature pipelines and trading indicators"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Ubaid Mushtaq" }]
+keywords = ["look-ahead bias", "data leakage", "time series", "backtesting", "technical analysis"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = ["numpy>=1.23", "pandas>=1.5"]
+
+[project.optional-dependencies]
+# Libraries audited by experiments/audit_indicator_libraries.py.  Not needed for the core.
+indicators = [
+    "ta",
+    "finta",
+    "stockstats",
+    "pandas-ta-classic",
+    "TA-Lib",
+    "bta-lib",
+]
+dev = ["pytest>=7"]
+
+[project.scripts]
+futureleak = "futureleak.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+futureleak = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
